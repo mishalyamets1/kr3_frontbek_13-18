@@ -1,11 +1,11 @@
 {
-    "name": "Список дел",
-    "short_name": "Дела",
+    "name": "Заметки",
+    "short_name": "Заметки",
     "start_url": "/",
     "display": "standalone",
     "background_color": "#ffffff",
     "theme_color": "#4285f4",
-    "description": "Простое приложение для управления списком дел, работающее офлайн",
+    "description": "Progressive Web App для управления заметками, работающее полностью офлайн",
     "orientation": "portrait-primary",
     "scope": "/",
     "icons": [
@@ -45,26 +45,9 @@
             "type": "image/png"
         },
         {
-            "src": "icons/favicon-512x512-maskable.png",
-            "sizes": "512x512",
-            "type": "image/png",
-            "purpose": "maskable"
-        }
-    ],
-    "screenshots": [
-        {
-            "src": "icons/screenshot-desktop.png",
-            "sizes": "1280x720",
-            "type": "image/png",
-            "form_factor": "wide",
-            "label": "Главный экран приложения на десктопе"
-        },
-        {
-            "src": "icons/screenshot-mobile.png",
-            "sizes": "540x720",
-            "type": "image/png",
-            "form_factor": "narrow",
-            "label": "Главный экран приложения на мобильном"
+            "src": "icons/icon-152x152.png",
+            "sizes": "152x152",
+            "type": "image/png"
         }
     ]
 }

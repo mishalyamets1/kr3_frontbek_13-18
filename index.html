@@ -3,65 +3,52 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <!-- Web App Manifest -->
-    <link rel="manifest" href="manifest.json">
-
-    <!-- Для Android -->
+    <link rel="manifest" href="/manifest.json">
     <meta name="mobile-web-app-capable" content="yes">
-
-    <!-- Цвет темы для браузера -->
     <meta name="theme-color" content="#4285f4">
-
-    <!-- Для iOS (иконка на домашний экран) -->
-    <link rel="apple-touch-icon" href="icons/icon-152x152.png">
-
-    <!-- Для iOS (статус бар) -->
+    <link rel="apple-touch-icon" href="/icons/icon-152x152.png">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-
-    <title>Список дел (13-18)</title>
-    <link rel="icon" href="icons/favicon.ico" sizes="16x16" type="image/ico">
+    <title>Заметки (13-18)</title>
     <link rel="stylesheet" href="https://unpkg.com/chota@latest">
+    <link rel="icon" href="/icons/favicon.ico" sizes="16x16" type="image/ico">
     <style>
-        body { max-width: 700px; margin: 40px auto; padding: 0 16px; }
-        h1 { margin-bottom: 24px; }
-        #tasks-list { list-style: none; padding: 0; margin-top: 20px; }
-        #tasks-list li {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 10px 14px;
-            border: 1px solid #e0e0e0;
-            border-radius: 4px;
-            margin-bottom: 8px;
-            background: #fff;
-        }
-        #tasks-list li.done span { text-decoration: line-through; color: #999; }
-        .task-actions { display: flex; gap: 8px; }
-        #offline-banner {
-            display: none;
-            background: #f0ad4e;
-            color: #fff;
+        body { max-width: 700px; margin: 0 auto; padding: 0 16px; }
+        header { padding: 20px 0; border-bottom: 1px solid #e0e0e0; margin-bottom: 20px; }
+        header h1 { margin: 0 0 16px 0; font-size: 1.5rem; }
+        .tabs { display: flex; gap: 0; margin-bottom: 0; }
+        .tabs .tab { 
+            flex: 1; 
+            padding: 12px; 
+            border: 1px solid #e0e0e0; 
+            background: #f5f5f5; 
+            cursor: pointer; 
             text-align: center;
-            padding: 8px;
-            border-radius: 4px;
-            margin-bottom: 16px;
         }
-        #offline-banner.visible { display: block; }
+        .tabs .tab.active { background: #fff; border-bottom: 2px solid #4285f4; }
+        main { margin-top: 20px; }
+        #notes-list { list-style: none; padding: 0; }
+        #notes-list li { padding: 12px; border: 1px solid #e0e0e0; margin-bottom: 8px; border-radius: 4px; background: #fff; }
+        .about-content { line-height: 1.6; }
+        .about-content p { margin: 12px 0; }
     </style>
 </head>
 <body>
-    <h1>Список дел — офлайн-приложение</h1>
-    <div id="offline-banner">Нет подключения к интернету — работаем из кэша</div>
-
-    <form id="task-form" class="row">
-        <input class="col-9" type="text" id="task-input" placeholder="Введите задачу" required>
-        <button class="col-3" type="submit">Добавить</button>
-    </form>
-
-    <ul id="tasks-list"></ul>
-
+    <header>
+        <h1>Заметки — наше первое <span class="no-break">офлайн-приложение</span></h1>
+        <nav class="tabs is-center">
+            <button id="home-btn" class="tab active col-6">Главная</button>
+            <button id="about-btn" class="tab col-6">О приложении</button>
+        </nav>
+    </header>
+    <main id="app-content" class="container">
+        <!-- Сюда будет загружаться контент -->
+    </main>
+    <footer class="is-center" style="margin-top: 2rem; padding: 1rem 0; border-top: 1px solid #e0e0e0;">
+        <button id="enable-push" class="button success">Включить уведомления</button>
+        <button id="disable-push" class="button error" style="display:none;">Отключить уведомления</button>
+    </footer>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
