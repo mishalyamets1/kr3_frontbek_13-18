@@ -94,7 +94,7 @@ self.addEventListener('fetch', event => {
 self.addEventListener('push', (event) => {
     console.log('SW: push event received');
     
-    let data = { title: 'Новое уведомление', body: '' };
+    let data = { title: 'Новое уведомление', body: '', reminderId: null };
     if (event.data) {
         data = event.data.json();
     }
@@ -105,8 +105,15 @@ self.addEventListener('push', (event) => {
         badge: '/icons/favicon-48x48.png',
         vibrate: [200, 100, 200],
         tag: 'note-notification',
-        requireInteraction: false
+        requireInteraction: false,
+        data: { reminderId: data.reminderId }
     };
+
+    if (data.reminderId) {
+        options.actions = [
+            { action: 'snooze', title: 'Отложить на 5 минут' }
+        ];
+    }
     
     event.waitUntil(
         self.registration.showNotification(data.title, options)
@@ -116,9 +123,22 @@ self.addEventListener('push', (event) => {
 // Обработчик клика по уведомлению
 self.addEventListener('notificationclick', (event) => {
     console.log('SW: notification click');
-    event.notification.close();
-    
-    event.waitUntil(
-        clients.openWindow('/')
-    );
+    const notification = event.notification;
+    const action = event.action;
+
+    if (action === 'snooze') {
+        const reminderId = notification?.data?.reminderId;
+
+        event.waitUntil(
+            fetch(`/snooze?reminderId=${reminderId}`, { method: 'POST' })
+                .then(() => notification.close())
+                .catch(err => {
+                    console.error('Snooze failed:', err);
+                    notification.close();
+                })
+        );
+    } else {
+        notification.close();
+        event.waitUntil(clients.openWindow('/'));
+    }
 });

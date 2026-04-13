@@ -1,5 +1,18 @@
 // Socket.IO подключение
+console.log('📡 Подключаюсь к Socket.IO...');
 const socket = io('http://localhost:3001');
+
+socket.on('connect', () => {
+    console.log('✅ Socket.IO подключен! ID:', socket.id);
+});
+
+socket.on('disconnect', () => {
+    console.log('❌ Socket.IO отключен');
+});
+
+socket.on('error', (err) => {
+    console.error('❌ Socket.IO ошибка:', err);
+});
 
 // DOM элементы
 const contentDiv = document.getElementById('app-content');
@@ -19,21 +32,28 @@ function urlBase64ToUint8Array(base64String) {
 }
 
 // Функция подписки на push
+async function syncSubscriptionWithServer(subscription) {
+    await fetch('http://localhost:3001/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(subscription)
+    });
+}
+
 async function subscribeToPush() {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
     
     try {
         const registration = await navigator.serviceWorker.ready;
-        const subscription = await registration.pushManager.subscribe({
-            userVisibleOnly: true,
-            applicationServerKey: urlBase64ToUint8Array('BJ-35-_hA1zmblHdCIlFyyb5J_CzG_AchRraiktI9XREwCqtDfBTSVpxOk-dVS_Rewzg3-nySMN1XCgSOUlz6No')
-        });
+        let subscription = await registration.pushManager.getSubscription();
+        if (!subscription) {
+            subscription = await registration.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: urlBase64ToUint8Array('BJ-35-_hA1zmblHdCIlFyyb5J_CzG_AchRraiktI9XREwCqtDfBTSVpxOk-dVS_Rewzg3-nySMN1XCgSOUlz6No')
+            });
+        }
 
-        await fetch('http://localhost:3001/subscribe', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(subscription)
-        });
+        await syncSubscriptionWithServer(subscription);
         
         console.log('Подписка на push отправлена');
     } catch (err) {
@@ -114,35 +134,90 @@ aboutBtn.addEventListener('click', () => {
 loadContent('home');
 
 // Функционал заметок (localStorage)
+function getNotesFromStorage() {
+    const rawNotes = JSON.parse(localStorage.getItem('notes') || '[]');
+    let changed = false;
+
+    const normalized = rawNotes.map((note, index) => {
+        if (typeof note === 'string') {
+            changed = true;
+            return { id: Date.now() + index, text: note, done: false, reminder: null };
+        }
+
+        const normalizedNote = {
+            id: note.id || Date.now() + index,
+            text: note.text || '',
+            done: Boolean(note.done),
+            reminder: note.reminder || null
+        };
+
+        if (!note.id || !Object.prototype.hasOwnProperty.call(note, 'reminder')) {
+            changed = true;
+        }
+
+        return normalizedNote;
+    });
+
+    if (changed) {
+        localStorage.setItem('notes', JSON.stringify(normalized));
+    }
+
+    return normalized;
+}
+
+function renderNotesList() {
+    const list = document.getElementById('notes-list');
+    if (!list) return;
+
+    const notes = getNotesFromStorage();
+    list.innerHTML = notes.map((note) => {
+        let reminderInfo = '';
+        if (note.reminder) {
+            const date = new Date(note.reminder);
+            reminderInfo = `<br><small>!!! Напоминание: ${date.toLocaleString()}</small>`;
+        }
+
+        return `
+            <li class="card" style="margin-bottom: 0.5rem; padding: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
+                <span style="${note.done ? 'text-decoration: line-through; color: #999;' : ''}">${note.text}${reminderInfo}</span>
+                <div style="display: flex; gap: 0.5rem;">
+                    <button onclick="toggleNote(${note.id})" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;">${note.done ? 'Отменить' : 'Готово'}</button>
+                    <button onclick="deleteNote(${note.id})" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;">Удалить</button>
+                </div>
+            </li>
+        `;
+    }).join('');
+}
+
 function initNotes() {
     const form = document.getElementById('note-form');
     const input = document.getElementById('note-input');
-    const list = document.getElementById('notes-list');
+    const reminderForm = document.getElementById('reminder-form');
+    const reminderText = document.getElementById('reminder-text');
+    const reminderTime = document.getElementById('reminder-time');
 
-    function loadNotes() {
-        const notes = JSON.parse(localStorage.getItem('notes') || '[]');
-        list.innerHTML = notes.map((note, i) => {
-            const isDone = note.done ? 'done' : '';
-            return `
-                <li class="card ${isDone}" style="margin-bottom: 0.5rem; padding: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
-                    <span style="${note.done ? 'text-decoration: line-through; color: #999;' : ''}">${note.text}</span>
-                    <div style="display: flex; gap: 0.5rem;">
-                        <button onclick="toggleNote(${i})" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;">${note.done ? 'Отменить' : 'Готово'}</button>
-                        <button onclick="deleteNote(${i})" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;">Удалить</button>
-                    </div>
-                </li>
-            `;
-        }).join('');
-    }
+    function addNote(text, reminderTimestamp = null) {
+        const notes = getNotesFromStorage();
+        const newNote = {
+            id: Date.now(),
+            text,
+            done: false,
+            reminder: reminderTimestamp
+        };
 
-    function addNote(text) {
-        const notes = JSON.parse(localStorage.getItem('notes') || '[]');
-        notes.push({ text, done: false });
+        notes.push(newNote);
         localStorage.setItem('notes', JSON.stringify(notes));
-        loadNotes();
-        
-        // Отправляем событие на сервер через WebSocket
-        socket.emit('newTask', { text, timestamp: Date.now() });
+        renderNotesList();
+
+        if (reminderTimestamp) {
+            socket.emit('newReminder', {
+                id: newNote.id,
+                text,
+                reminderTime: reminderTimestamp
+            });
+        } else {
+            socket.emit('newTask', { text, timestamp: Date.now() });
+        }
     }
 
     form.addEventListener('submit', (e) => {
@@ -154,51 +229,51 @@ function initNotes() {
         }
     });
 
-    loadNotes();
+    if (reminderForm) {
+        reminderForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+
+            const text = reminderText.value.trim();
+            const datetime = reminderTime.value;
+
+            if (text && datetime) {
+                const timestamp = new Date(datetime).getTime();
+                if (timestamp > Date.now()) {
+                    addNote(text, timestamp);
+                    reminderText.value = '';
+                    reminderTime.value = '';
+                } else {
+                    alert('Дата напоминания должна быть в будущем');
+                }
+            }
+        });
+    }
+
+    renderNotesList();
 }
 
 // Глобальные функции для удаления и выполнения заметок
-function toggleNote(index) {
-    const notes = JSON.parse(localStorage.getItem('notes') || '[]');
+function toggleNote(noteId) {
+    const notes = getNotesFromStorage();
+    const index = notes.findIndex(note => note.id === noteId);
+    if (index === -1) return;
+
     notes[index].done = !notes[index].done;
     localStorage.setItem('notes', JSON.stringify(notes));
-    // Перезагружаем список
-    const list = document.getElementById('notes-list');
-    const notes2 = JSON.parse(localStorage.getItem('notes') || '[]');
-    list.innerHTML = notes2.map((note, i) => {
-        const isDone = note.done ? 'done' : '';
-        return `
-            <li class="card ${isDone}" style="margin-bottom: 0.5rem; padding: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
-                <span style="${note.done ? 'text-decoration: line-through; color: #999;' : ''}">${note.text}</span>
-                <div style="display: flex; gap: 0.5rem;">
-                    <button onclick="toggleNote(${i})" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;">${note.done ? 'Отменить' : 'Готово'}</button>
-                    <button onclick="deleteNote(${i})" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;">Удалить</button>
-                </div>
-            </li>
-        `;
-    }).join('');
+    renderNotesList();
 }
 
-function deleteNote(index) {
-    const notes = JSON.parse(localStorage.getItem('notes') || '[]');
-    notes.splice(index, 1);
-    localStorage.setItem('notes', JSON.stringify(notes));
-    // Перезагружаем список
-    const list = document.getElementById('notes-list');
-    const notes2 = JSON.parse(localStorage.getItem('notes') || '[]');
-    list.innerHTML = notes2.map((note, i) => {
-        const isDone = note.done ? 'done' : '';
-        return `
-            <li class="card ${isDone}" style="margin-bottom: 0.5rem; padding: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
-                <span style="${note.done ? 'text-decoration: line-through; color: #999;' : ''}">${note.text}</span>
-                <div style="display: flex; gap: 0.5rem;">
-                    <button onclick="toggleNote(${i})" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;">${note.done ? 'Отменить' : 'Готово'}</button>
-                    <button onclick="deleteNote(${i})" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;">Удалить</button>
-                </div>
-            </li>
-        `;
-    }).join('');
+function deleteNote(noteId) {
+    const notes = getNotesFromStorage();
+    const filtered = notes.filter(note => note.id !== noteId);
+    if (filtered.length === notes.length) return;
+
+    localStorage.setItem('notes', JSON.stringify(filtered));
+    renderNotesList();
 }
+
+window.toggleNote = toggleNote;
+window.deleteNote = deleteNote;
 
 // Регистрация Service Worker и настройка push-уведомлений
 if ('serviceWorker' in navigator) {
@@ -219,6 +294,8 @@ if ('serviceWorker' in navigator) {
                 if (subscription) {
                     enableBtn.style.display = 'none';
                     disableBtn.style.display = 'inline-block';
+                    // После перезапуска сервера синхронизируем подписку повторно.
+                    await syncSubscriptionWithServer(subscription);
                 }
                 
                 // Обработчик включения уведомлений
